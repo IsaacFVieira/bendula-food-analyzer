@@ -1,5 +1,7 @@
 import { ToastMessage } from '@/types';
 
+export type { ToastMessage };
+
 let listeners: ((toasts: ToastMessage[]) => void)[] = [];
 let toasts: ToastMessage[] = [];
 

@@ -65,7 +65,9 @@ export function History({ history, onSelect, onRefresh }: HistoryProps) {
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
-                    {item.analysis.summary.slice(0, 50)}...
+                    {'summary' in item.analysis && typeof item.analysis.summary === 'string'
+                      ? (item.analysis.summary as string).slice(0, 50) + '...'
+                      : 'Sem resumo'}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {formatDate(item.timestamp)}
