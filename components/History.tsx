@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { Card, CardContent } from './ui/Card';
 import { Button } from './ui/Button';
 import { Trash2, Clock } from 'lucide-react';
@@ -58,10 +59,13 @@ export function History({ history, onSelect, onRefresh }: HistoryProps) {
           >
             <CardContent className="p-4">
               <div className="flex items-start gap-4">
-                <img
-                  src={item.imageUrl}
+                <Image
+                  src={item.imageUrl || ''}
                   alt="Thumbnail"
+                  width={64}
+                  height={64}
                   className="w-16 h-16 object-cover rounded-lg"
+                  unoptimized
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">

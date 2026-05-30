@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
+import Image from 'next/image';
 import { Upload, X, Image as ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UploadState } from '@/types';
@@ -25,30 +26,7 @@ export function ImageUpload({ onImageSelect, state, onClear }: ImageUploadProps)
     setIsDragging(false);
   }, []);
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setIsDragging(false);
-
-      const file = e.dataTransfer.files[0];
-      if (file) {
-        processFile(file);
-      }
-    },
-    []
-  );
-
-  const handleFileSelect = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        processFile(file);
-      }
-    },
-    []
-  );
-
-  const processFile = async (file: File) => {
+  const processFile = useCallback(async (file: File) => {
     // Validações
     if (!isValidImageFile(file)) {
       onImageSelect('', file);
@@ -73,16 +51,42 @@ export function ImageUpload({ onImageSelect, state, onClear }: ImageUploadProps)
       onImageSelect('', file);
       onClear();
     }
-  };
+  }, [onImageSelect, onClear]);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+
+      const file = e.dataTransfer.files[0];
+      if (file) {
+        processFile(file);
+      }
+    },
+    [processFile]
+  );
+
+  const handleFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        processFile(file);
+      }
+    },
+    [processFile]
+  );
 
   return (
     <div className="w-full">
       {state.preview ? (
         <div className="relative group">
-          <img
+          <Image
             src={state.preview}
             alt="Preview"
+            width={800}
+            height={256}
             className="w-full h-64 object-contain rounded-xl border-2 border-border bg-card"
+            unoptimized
           />
           <button
             onClick={onClear}

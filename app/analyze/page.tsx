@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { ArrowLeft } from 'lucide-react';
 import { ImageUpload } from '@/components/ImageUpload';
 import { AnalysisResult } from '@/components/AnalysisResult';
@@ -175,10 +176,13 @@ export default function AnalyzePage() {
                 </div>
                 
                 {uploadState.preview && (
-                  <img
+                  <Image
                     src={uploadState.preview}
                     alt="Analyzed"
+                    width={800}
+                    height={256}
                     className="w-full h-64 object-contain rounded-xl border-2 border-[#e5e7eb] bg-white mb-6"
+                    unoptimized
                   />
                 )}
                 
