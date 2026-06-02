@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { FoodAnalysis } from '@/types';
+import { errorLogger, ErrorType } from './errorLogger';
 
 // Função para mascarar API key para logs seguros
 function maskApiKey(key: string): string {
@@ -7,27 +8,9 @@ function maskApiKey(key: string): string {
   return `****${key.slice(-4)}`;
 }
 
-// Inicializa o cliente Google Generative AI
-const apiKey = process.env.GEMINI_API_KEY || '';
-
-if (!apiKey) {
-  console.error('[AI Service] GEMINI_API_KEY não configurada nas variáveis de ambiente');
-  throw new Error('GEMINI_API_KEY não configurada');
-}
-
-const genAI = new GoogleGenerativeAI(apiKey);
-
-console.log('[AI Service] SDK Gemini inicializado');
-console.log('[AI Service] API key carregada com sucesso');
-console.log(`[AI Service] Utilizando key terminada em: ${maskApiKey(apiKey)}`);
-
 // Configurações de retry
 const MAX_RETRIES = 3;
 const REQUEST_TIMEOUT_MS = 30000;
-
-// Cache simples em memória para evitar reprocessamento
-const imageCache = new Map<string, { result: FoodAnalysis; timestamp: number }>();
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
 
 // Lista de modelos válidos em ordem de prioridade (fallback em cascata)
 const MODEL_PRIORITY = [
@@ -142,39 +125,28 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 }
 
 /**
- * Limpa entradas expiradas do cache
- */
-function cleanExpiredCache(): void {
-  const now = Date.now();
-  for (const [key, value] of imageCache.entries()) {
-    if (now - value.timestamp > CACHE_TTL_MS) {
-      imageCache.delete(key);
-    }
-  }
-}
-
-/**
  * Analisa uma imagem usando a API Vision do Google Gemini com fallback de modelos
  * Focado exclusivamente em detecção de alimentos e bebidas
  * @param imageBase64 - Imagem em formato base64
  * @returns Análise do alimento com informações nutricionais e alergénios
  */
 export async function analyzeImage(imageBase64: string): Promise<FoodAnalysis> {
-  // Limpa cache expirado periodicamente
-  cleanExpiredCache();
+  // Inicializa o cliente Google Generative AI dentro da função para isolamento de requisições
+  const apiKey = process.env.GEMINI_API_KEY || '';
 
-  // Gera hash da imagem para cache
-  const imageHash = imageBase64.substring(0, 100); // Usa primeiros 100 caracteres como hash simples
-  
-  // Verifica cache
-  const cached = imageCache.get(imageHash);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-    console.log('[AI Service] Cache hit - reutilizando resultado anterior');
-    return cached.result;
+  if (!apiKey) {
+    console.error('[AI Service] GEMINI_API_KEY não configurada nas variáveis de ambiente');
+    throw new Error('GEMINI_API_KEY não configurada');
   }
 
+  const genAI = new GoogleGenerativeAI(apiKey);
+
+  console.log('[AI Service] SDK Gemini inicializado');
+  console.log('[AI Service] API key carregada com sucesso');
+  console.log(`[AI Service] Utilizando key terminada em: ${maskApiKey(apiKey)}`);
+
   // Determina lista de modelos a tentar (prioridade + fallback)
-  const modelsToTry = process.env.MODEL_NAME 
+  const modelsToTry = process.env.MODEL_NAME
     ? [process.env.MODEL_NAME, ...MODEL_PRIORITY.filter(m => m !== process.env.MODEL_NAME)]
     : MODEL_PRIORITY;
 
@@ -261,17 +233,14 @@ INSTRUÇÕES:
         try {
           const parsed = JSON.parse(cleanContent);
           console.log('[AI Service] JSON parseado com sucesso');
-          
+
           // Valida estrutura mínima
           if (typeof parsed.is_food !== 'boolean') {
             throw new Error('Campo is_food obrigatório não encontrado');
           }
-          
-          // Armazena resultado no cache
-          imageCache.set(imageHash, { result: parsed as FoodAnalysis, timestamp: Date.now() });
-          console.log('[AI Service] Resultado armazenado no cache');
+
           console.log(`[AI Service] Modelo ativo: ${modelName}`);
-          
+
           return parsed as FoodAnalysis;
         } catch (parseError) {
           console.error('[AI Service] Erro ao fazer parse do JSON:', parseError);
@@ -285,6 +254,10 @@ INSTRUÇÕES:
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         console.error(`[AI Service] Erro na tentativa ${attempt} com modelo ${modelName}:`, lastError.message);
+
+        // Log do erro estruturado
+        const errorType = errorLogger.detectErrorType(lastError);
+        errorLogger.log(errorType, lastError.message, { modelName, attempt }, 'analyzeImage');
 
         // Verifica se é erro de quota (não deve retry nem fazer fallback)
         if (isQuotaError(lastError)) {
@@ -320,5 +293,6 @@ INSTRUÇÕES:
   }
 
   // Se todos os modelos falharam
+  errorLogger.log(ErrorType.SERVICE_UNAVAILABLE, 'Todos os modelos de IA falharam', { lastError: lastError?.message }, 'analyzeImage');
   throw new Error('SERVICE_UNAVAILABLE: Nenhum modelo de IA disponível no momento. Tente novamente mais tarde.');
 }

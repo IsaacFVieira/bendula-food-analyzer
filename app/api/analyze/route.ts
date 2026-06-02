@@ -4,14 +4,14 @@ import { analyzeImage } from '@/services/aiService';
 export async function POST(request: NextRequest) {
   try {
     console.log('[API Route] Recebendo requisição de análise...');
-    
+
     const body = await request.json();
-    const { imageBase64 } = body;
+    const { imageBase64, requestId } = body;
 
     if (!imageBase64) {
       console.error('[API Route] Imagem não fornecida');
       return NextResponse.json(
-        { 
+        {
           success: false,
           errorType: 'INVALID_INPUT',
           message: 'Imagem não fornecida'
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     if (typeof imageBase64 !== 'string' || imageBase64.length === 0) {
       console.error('[API Route] Formato de imagem inválido');
       return NextResponse.json(
-        { 
+        {
           success: false,
           errorType: 'INVALID_INPUT',
           message: 'Formato de imagem inválido'
@@ -37,9 +37,10 @@ export async function POST(request: NextRequest) {
     const analysis = await analyzeImage(imageBase64);
 
     console.log('[API Route] Análise concluída com sucesso');
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
-      analysis 
+      analysis,
+      requestId: requestId || null
     });
   } catch (error) {
     console.error('[API Route] Erro na API de análise:', error);

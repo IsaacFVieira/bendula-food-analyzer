@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { AnalysisResult, FoodAnalysis, ManualFoodEntry, User } from '@/types';
 
 interface AnalysisContextType {
@@ -21,6 +21,12 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [currentAnalysis, setCurrentAnalysis] = useState<AnalysisResult | null>(null);
   const [manualEntry, setManualEntry] = useState<ManualFoodEntry | null>(null);
+
+  // Clear analysis on mount to prevent cross-session contamination
+  useEffect(() => {
+    setCurrentAnalysis(null);
+    setManualEntry(null);
+  }, []);
 
   const isLoggedIn = !!user;
 

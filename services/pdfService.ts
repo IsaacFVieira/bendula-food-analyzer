@@ -2,6 +2,26 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FoodAnalysis, ManualFoodEntry, AnalysisResult } from '@/types';
 
+// Color Palette Constants
+const COLOR_PRIMARY = '#1A7A4A';
+const COLOR_PRIMARY_DARK = '#0F4F30';
+const COLOR_PRIMARY_LIGHT = '#E8F5EE';
+const COLOR_ACCENT = '#2ECC71';
+const COLOR_WHITE = '#FFFFFF';
+const COLOR_TEXT_DARK = '#1C2B22';
+const COLOR_TEXT_MUTED = '#5A7A65';
+const COLOR_BORDER = '#C8E6D5';
+const COLOR_ALERT_BG = '#FFF8E1';
+const COLOR_ALERT_TEXT = '#7A5C00';
+
+// Helper function to convert hex to RGB array
+const hexToRgb = (hex: string): [number, number, number] => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result
+    ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
+    : [0, 0, 0];
+};
+
 // Extend jsPDF to include autoTable
 declare module 'jspdf' {
   interface jsPDF {
@@ -22,66 +42,78 @@ export class PDFService {
     this.margin = 20;
   }
 
-  private addHeader(title: string, subtitle: string) {
-    // Professional dark gray header
-    this.doc.setFillColor(51, 51, 51); // #333333
-    this.doc.rect(0, 0, this.pageWidth, 45, 'F');
+  private addHeader(title: string, subtitle: string, isFirstPage: boolean = true) {
+    const headerHeight = isFirstPage ? 60 : 22;
+    const headerRgb = hexToRgb(COLOR_PRIMARY_DARK);
+    const accentRgb = hexToRgb(COLOR_ACCENT);
 
-    // White text for title
-    this.doc.setTextColor(255, 255, 255);
-    this.doc.setFontSize(18);
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.text(title, this.margin, 18);
+    // Header background
+    this.doc.setFillColor(headerRgb[0], headerRgb[1], headerRgb[2]);
+    this.doc.rect(0, 0, this.pageWidth, headerHeight, 'F');
 
-    // Lighter gray for subtitle
-    this.doc.setFontSize(11);
-    this.doc.setFont('helvetica', 'normal');
-    this.doc.setTextColor(220, 220, 220);
-    this.doc.text(subtitle, this.margin, 28);
+    if (isFirstPage) {
+      // Main header (page 1)
+      // White text for title
+      this.doc.setTextColor(255, 255, 255);
+      this.doc.setFontSize(21);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.text(title, this.margin, 22);
+
+      // Accent color for subtitle
+      this.doc.setFontSize(11);
+      this.doc.setFont('helvetica', 'normal');
+      this.doc.setTextColor(accentRgb[0], accentRgb[1], accentRgb[2]);
+      this.doc.text(subtitle, this.margin, 38);
+    } else {
+      // Repeated header (subsequent pages)
+      this.doc.setTextColor(255, 255, 255);
+      this.doc.setFontSize(10);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.text(title, this.margin, 14);
+    }
   }
 
   private addSectionTitle(title: string, y: number) {
-    this.doc.setTextColor(51, 51, 51); // Dark gray
-    this.doc.setFontSize(13);
+    const primaryRgb = hexToRgb(COLOR_PRIMARY);
+    const primaryLightRgb = hexToRgb(COLOR_PRIMARY_LIGHT);
+
+    // Section title in primary color
+    this.doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2]);
+    this.doc.setFontSize(11);
     this.doc.setFont('helvetica', 'bold');
     this.doc.text(title, this.margin, y);
-    
-    // Add underline
-    this.doc.setDrawColor(22, 163, 74); // Green accent
+
+    // Horizontal line in primary light color
+    this.doc.setDrawColor(primaryLightRgb[0], primaryLightRgb[1], primaryLightRgb[2]);
     this.doc.setLineWidth(0.5);
     this.doc.line(this.margin, y + 3, this.pageWidth - this.margin, y + 3);
-    
+
     return y + 12;
   }
 
   private addFooter(pageNum: number, totalPages: number) {
-    const footerY = this.pageHeight - 35;
-    
-    // Subtle divider line
-    this.doc.setDrawColor(200, 200, 200);
-    this.doc.setLineWidth(0.3);
-    this.doc.line(this.margin, footerY - 12, this.pageWidth - this.margin, footerY - 12);
+    const footerY = this.pageHeight - 25;
+    const borderRgb = hexToRgb(COLOR_BORDER);
+    const mutedRgb = hexToRgb(COLOR_TEXT_MUTED);
+
+    // Divider line
+    this.doc.setDrawColor(borderRgb[0], borderRgb[1], borderRgb[2]);
+    this.doc.setLineWidth(0.5);
+    this.doc.line(this.margin, footerY - 8, this.pageWidth - this.margin, footerY - 8);
 
     // Footer text
-    this.doc.setFontSize(8);
-    this.doc.setTextColor(100, 100, 100);
+    this.doc.setFontSize(7);
+    this.doc.setTextColor(mutedRgb[0], mutedRgb[1], mutedRgb[2]);
     this.doc.setFont('helvetica', 'normal');
-    
-    // System name (identification)
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.text('Bendula Food Analyzer', this.margin, footerY);
-    
-    // Contact information
-    this.doc.setFont('helvetica', 'normal');
-    this.doc.text('Site: bendulafoodanalyzer.com', this.margin, footerY + 6);
-    this.doc.text('Email: isaacvieira1224@gmail.com', this.margin, footerY + 12);
-    this.doc.text('Telefone: +244 936310371', this.margin, footerY + 18);
-    
-    // Automation note (centered)
-    this.doc.text('Relatório gerado automaticamente', this.pageWidth / 2, footerY + 6, { align: 'center' });
-    
-    // Page number on the right
-    this.doc.text(`Página ${pageNum} de ${totalPages}`, this.pageWidth - this.margin, footerY + 12, { align: 'right' });
+
+    // Left: Spaço Uma Gravi contact
+    this.doc.text('Spaço Uma Gravi', this.margin, footerY);
+
+    // Center: Email
+    this.doc.text('contato@espacoumagravi.com', this.pageWidth / 2, footerY, { align: 'center' });
+
+    // Right: Page number
+    this.doc.text(`Relatório Técnico Nutricional — Pág. ${pageNum} de ${totalPages}`, this.pageWidth - this.margin, footerY, { align: 'right' });
   }
 
   private getSafeFinalY(defaultY: number): number {
@@ -96,16 +128,16 @@ export class PDFService {
   }
 
   private checkPageBreak(y: number, requiredSpace: number = 40): boolean {
-    const footerMargin = 60; // 60px margin for footer safety
+    const footerMargin = 45; // 45px margin for footer safety
     const footerStart = this.pageHeight - footerMargin;
     return y + requiredSpace > footerStart;
   }
 
-  private ensurePageBreak(y: number, requiredSpace: number = 40): number {
+  private ensurePageBreak(y: number, requiredSpace: number = 40, isFirstPage: boolean = false): number {
     if (this.checkPageBreak(y, requiredSpace)) {
       this.doc.addPage();
-      this.addHeader('Bendula Food Analyzer', 'Relatório Nutricional Inteligente');
-      return 55; // Reset Y to top of new page
+      this.addHeader('Bendula Food Analyzer', 'Relatório Nutricional Inteligente', isFirstPage);
+      return isFirstPage ? 70 : 32; // Reset Y to top of new page based on header height
     }
     return y;
   }
@@ -120,21 +152,30 @@ export class PDFService {
     const category = isImageAnalysis ? (analysis.food_type || 'Não especificado') : 'Alimento';
     const supplier = isImageAnalysis ? 'N/A' : (manualData.supplier || 'N/A');
     const expiry = isImageAnalysis ? 'N/A' : (manualData.expiryDate ? new Date(manualData.expiryDate).toLocaleDateString('pt-PT') : 'N/A');
-    const ingredients = isImageAnalysis 
-      ? (analysis.ingredients?.join(', ') || 'N/A') 
+    const ingredients = isImageAnalysis
+      ? (analysis.ingredients?.join(', ') || 'N/A')
       : (manualData.notes || 'N/A');
 
-    const calories = isImageAnalysis ? 0 : (manualData.calories || 0);
-    const sugar = isImageAnalysis ? 0 : (manualData.sugar || 0);
-    const sodium = isImageAnalysis ? 0 : (manualData.sodium || 0);
-    const fat = isImageAnalysis ? 0 : (manualData.fat || 0);
+    // Extract nutritional values - use real values if available, otherwise show N/A
+    const calories = isImageAnalysis
+      ? (analysis.nutritional_info?.calories ?? null)
+      : (manualData.calories || null);
+    const sugar = isImageAnalysis
+      ? (analysis.nutritional_info?.sugar ?? null)
+      : (manualData.sugar || null);
+    const sodium = isImageAnalysis
+      ? (analysis.nutritional_info?.sodium ?? null)
+      : (manualData.sodium || null);
+    const fat = isImageAnalysis
+      ? (analysis.nutritional_info?.fat ?? null)
+      : (manualData.fat || null);
 
     const healthScore = isImageAnalysis ? (analysis.health_score || 0) * 10 : 50;
-    
+
     // Classification logic
     let classification = 'Moderado';
     let classificationColor = [249, 115, 22]; // orange
-    
+
     if (healthScore >= 70) {
       classification = 'Saudável';
       classificationColor = [22, 163, 74]; // green
@@ -143,14 +184,14 @@ export class PDFService {
       classificationColor = [239, 68, 68]; // red
     }
 
-    // PAGE 1: Dados do Produto e Informação Nutricional
-    this.addHeader('Bendula Food Analyzer', 'Relatório Nutricional Inteligente');
+    // PAGE 1: Dashboard Único - Todas as informações consolidadas
+    this.addHeader('Bendula Food Analyzer', 'Relatório Técnico Nutricional', true);
 
-    let y = 55;
+    let y = 70;
 
     // Bloco 1: Dados do Produto
     y = this.addSectionTitle('Dados do Produto', y);
-    
+
     // Product data in technical list format with vertical bar delimiters
     this.doc.setFontSize(11);
     this.doc.setFont('helvetica', 'normal');
@@ -162,41 +203,40 @@ export class PDFService {
 
     productLines.forEach((line) => {
       this.doc.text(line, this.margin, y);
-      y += 8;
+      y += 6;
     });
 
-    y += 5;
+    y += 3;
 
     // Ingredients section
-    this.doc.setFontSize(11);
+    this.doc.setFontSize(10);
     this.doc.setFont('helvetica', 'bold');
     this.doc.setTextColor(51, 51, 51);
     this.doc.text('Ingredientes:', this.margin, y);
-    y += 8;
+    y += 6;
     this.doc.setFont('helvetica', 'normal');
     this.doc.setTextColor(80, 80, 80);
     const splitIngredients = this.doc.splitTextToSize(ingredients, this.pageWidth - 2 * this.margin);
     this.doc.text(splitIngredients, this.margin, y);
-    y += splitIngredients.length * 5 + 15;
+    y += splitIngredients.length * 4 + 10;
 
     // Highlight note after ingredients
-    if (sugar > 15 || sodium > 600 || fat > 20) {
+    if ((sugar !== null && sugar > 15) || (sodium !== null && sodium > 600) || (fat !== null && fat > 20)) {
       this.doc.setFillColor(255, 243, 205); // Light yellow background
-      this.doc.roundedRect(this.margin, y - 5, this.pageWidth - 2 * this.margin, 20, 3, 3, 'F');
-      this.doc.setFontSize(9);
+      this.doc.roundedRect(this.margin, y - 4, this.pageWidth - 2 * this.margin, 16, 3, 3, 'F');
+      this.doc.setFontSize(8);
       this.doc.setFont('helvetica', 'bold');
       this.doc.setTextColor(180, 83, 9); // Dark orange
-      const highlightText = sugar > 15 
+      const highlightText = (sugar !== null && sugar > 15)
         ? '⚠ Alto teor de açúcar, consumo deve ser ocasional.'
-        : sodium > 600 
+        : (sodium !== null && sodium > 600)
           ? '⚠ Alto teor de sódio, consumo deve ser moderado.'
           : '⚠ Alto teor de gordura, consumo deve ser moderado.';
-      this.doc.text(highlightText, this.margin + 5, y + 8);
-      y += 30;
+      this.doc.text(highlightText, this.margin + 4, y + 6);
+      y += 22;
     }
 
     // Check if we need a page break before nutritional table
-    // Nutritional table needs approximately 100px space, add buffer
     y = this.ensurePageBreak(y, 120);
 
     // Bloco 2: Informação Nutricional
@@ -204,19 +244,24 @@ export class PDFService {
 
     // Add date/time stamp below section title
     const timestamp = new Date(analysisResult.timestamp).toLocaleString('pt-PT');
-    this.doc.setFontSize(8);
+    this.doc.setFontSize(7);
     this.doc.setFont('helvetica', 'normal');
     this.doc.setTextColor(128, 128, 128);
     this.doc.text(`Gerado em: ${timestamp}`, this.margin, y);
-    y += 10;
+    y += 6;
 
     const nutritionalData = [
       ['Nutriente', 'Valor', 'Referência'],
-      ['Calorias', `${calories} kcal`, '< 400 ideal'],
-      ['Açúcar', `${sugar} g`, '< 10g ideal'],
-      ['Sódio', `${sodium} mg`, '< 400mg ideal'],
-      ['Gordura', `${fat} g`, '< 15g ideal'],
+      ['Calorias', calories !== null ? `${calories} kcal` : 'N/A', '< 400 ideal'],
+      ['Açúcar', sugar !== null ? `${sugar} g` : 'N/A', '< 10g ideal'],
+      ['Sódio', sodium !== null ? `${sodium} mg` : 'N/A', '< 400mg ideal'],
+      ['Gordura', fat !== null ? `${fat} g` : 'N/A', '< 15g ideal'],
     ];
+
+    const primaryRgb = hexToRgb(COLOR_PRIMARY);
+    const primaryLightRgb = hexToRgb(COLOR_PRIMARY_LIGHT);
+    const borderRgb = hexToRgb(COLOR_BORDER);
+    const textDarkRgb = hexToRgb(COLOR_TEXT_DARK);
 
     autoTable(this.doc, {
       startY: y,
@@ -224,135 +269,156 @@ export class PDFService {
       body: nutritionalData,
       theme: 'grid',
       headStyles: {
-        fillColor: [51, 51, 51],
+        fillColor: primaryRgb,
         textColor: [255, 255, 255],
         fontStyle: 'bold',
         fontSize: 10,
       },
       bodyStyles: {
         fontSize: 10,
-        textColor: [60, 60, 60],
+        textColor: textDarkRgb,
       },
       alternateRowStyles: {
-        fillColor: [245, 245, 245],
+        fillColor: primaryLightRgb,
       },
       margin: { left: this.margin, right: this.margin },
       styles: {
-        cellPadding: 8,
+        cellPadding: { vertical: 3, horizontal: 6 },
+        lineColor: borderRgb,
+        lineWidth: 0.5,
+        fontSize: 9,
       },
-      pageBreak: 'avoid', // Prevent table from splitting across pages
-      rowPageBreak: 'avoid', // Prevent rows from breaking
+      columnStyles: {
+        0: { halign: 'left' },
+        1: { halign: 'center' },
+        2: { halign: 'right' },
+      },
+      pageBreak: 'avoid',
+      rowPageBreak: 'avoid',
     });
 
     y = this.getSafeFinalY(y);
 
-    // Footer for page 1
-    this.addFooter(1, 2);
+    // Score Nutricional com destaque visual especial para ULTRAPROCESSADO
+    y = this.addSectionTitle('Score Nutricional', y);
 
-    // PAGE 2: Análise Visual dos Nutrientes e Resultados
-    this.doc.addPage();
-    this.addHeader('Bendula Food Analyzer', 'Relatório Nutricional Inteligente');
+    // Score card with visual highlight - especial para ULTRAPROCESSADO
+    const accentRgb = hexToRgb(COLOR_ACCENT);
+    const primaryDarkRgb = hexToRgb(COLOR_PRIMARY_DARK);
 
-    y = 55;
+    // Background color based on classification
+    if (classification === 'Ultraprocessado') {
+      this.doc.setFillColor(254, 226, 226); // Light red background for ultraprocessado
+    } else if (classification === 'Saudável') {
+      this.doc.setFillColor(236, 253, 245); // Light green background for healthy
+    } else {
+      this.doc.setFillColor(primaryLightRgb[0], primaryLightRgb[1], primaryLightRgb[2]); // Default light green
+    }
 
-    // Visual chart for nutritional values
-    y = this.addSectionTitle('Análise Visual dos Nutrientes', y);
+    this.doc.roundedRect(this.margin, y - 4, this.pageWidth - 2 * this.margin, 32, 5, 5, 'F');
 
-    const chartY = y;
-    const barHeight = 10;
-    const barSpacing = 14;
-    const maxBarWidth = this.pageWidth - 2 * this.margin - 70;
+    // Left accent border (4pt thick) - color based on classification
+    if (classification === 'Ultraprocessado') {
+      this.doc.setFillColor(239, 68, 68); // Red for ultraprocessado
+    } else if (classification === 'Saudável') {
+      this.doc.setFillColor(22, 163, 74); // Green for healthy
+    } else {
+      this.doc.setFillColor(accentRgb[0], accentRgb[1], accentRgb[2]); // Default green
+    }
 
-    // Calories (green)
+    this.doc.rect(this.margin, y - 4, 4, 32, 'F');
+
+    // Classification - color based on classification
+    this.doc.setTextColor(classificationColor[0], classificationColor[1], classificationColor[2]);
     this.doc.setFontSize(9);
     this.doc.setFont('helvetica', 'bold');
-    this.doc.setTextColor(51, 51, 51);
-    this.doc.text('Calorias', this.margin, chartY + 7);
-    this.doc.setFillColor(22, 163, 74);
-    const caloriesWidth = Math.min((calories / 400) * maxBarWidth, maxBarWidth);
-    this.doc.roundedRect(this.margin + 55, chartY, caloriesWidth, barHeight, 2, 2, 'F');
-    this.doc.setFont('helvetica', 'normal');
-    this.doc.setTextColor(80, 80, 80);
-    this.doc.text(`${calories} kcal`, this.margin + 55 + caloriesWidth + 8, chartY + 7);
+    this.doc.text(classification.toUpperCase(), this.margin + 12, y + 6);
 
-    // Sugar (orange)
+    // Score numeric
+    this.doc.setTextColor(primaryDarkRgb[0], primaryDarkRgb[1], primaryDarkRgb[2]);
+    this.doc.setFontSize(18);
     this.doc.setFont('helvetica', 'bold');
-    this.doc.setTextColor(51, 51, 51);
-    this.doc.text('Açúcar', this.margin, chartY + barSpacing + 7);
-    this.doc.setFillColor(249, 115, 22);
-    const sugarWidth = Math.min((sugar / 20) * maxBarWidth, maxBarWidth);
-    this.doc.roundedRect(this.margin + 55, chartY + barSpacing, sugarWidth, barHeight, 2, 2, 'F');
+    this.doc.text(`${healthScore}/100`, this.margin + 12, y + 20);
+
+    y += 38;
+
+    // Check page break
+    y = this.ensurePageBreak(y, 100);
+
+    // Bloco 3: Alertas de Alergénios - Quadro de destaque específico
+    y = this.addSectionTitle('Alertas de Alergénios', y);
+
+    const allergens = isImageAnalysis && analysis.possible_allergens ? analysis.possible_allergens : [];
+
+    if (allergens.length > 0) {
+      // Create special allergen alert box
+      const alertBgRgb = [254, 226, 226]; // Light red background
+      const alertTextRgb = [185, 28, 28]; // Dark red text
+      const alertBorderRgb = [239, 68, 68]; // Red border
+
+      this.doc.setFillColor(alertBgRgb[0], alertBgRgb[1], alertBgRgb[2]);
+      this.doc.roundedRect(this.margin, y - 4, this.pageWidth - 2 * this.margin, 20, 5, 5, 'F');
+
+      // Left red border (6pt thick for emphasis)
+      this.doc.setFillColor(alertBorderRgb[0], alertBorderRgb[1], alertBorderRgb[2]);
+      this.doc.rect(this.margin, y - 4, 6, 20, 'F');
+
+      // Warning icon
+      this.doc.setTextColor(alertTextRgb[0], alertTextRgb[1], alertTextRgb[2]);
+      this.doc.setFontSize(12);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.text('⚠', this.margin + 10, y + 8);
+
+      // Allergen text
+      this.doc.setFontSize(9);
+      this.doc.setFont('helvetica', 'bold');
+      const allergenText = `ALERTA: Contém alergénios - ${allergens.join(', ')}`;
+      const splitAllergen = this.doc.splitTextToSize(allergenText, this.pageWidth - 2 * this.margin - 20);
+      this.doc.text(splitAllergen, this.margin + 22, y + 8);
+
+      y += 24;
+    } else {
+      this.doc.setTextColor(accentRgb[0], accentRgb[1], accentRgb[2]);
+      this.doc.setFontSize(9);
+      this.doc.setFont('helvetica', 'normal');
+      this.doc.text('✓ Nenhum alergénio identificado.', this.margin, y);
+      y += 8;
+    }
+
+    y += 8;
+
+    // Check page break
+    y = this.ensurePageBreak(y, 100);
+
+    // Bloco 4: Conservação Recomendada - Lista organizada com ícones
+    y = this.addSectionTitle('Conservação Recomendada', y);
+    this.doc.setFontSize(9);
     this.doc.setFont('helvetica', 'normal');
-    this.doc.setTextColor(80, 80, 80);
-    this.doc.text(`${sugar} g`, this.margin + 55 + sugarWidth + 8, chartY + barSpacing + 7);
+    this.doc.setTextColor(hexToRgb(COLOR_TEXT_DARK)[0], hexToRgb(COLOR_TEXT_DARK)[1], hexToRgb(COLOR_TEXT_DARK)[2]);
 
-    // Sodium (blue)
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.setTextColor(51, 51, 51);
-    this.doc.text('Sódio', this.margin, chartY + barSpacing * 2 + 7);
-    this.doc.setFillColor(59, 130, 246);
-    const sodiumWidth = Math.min((sodium / 600) * maxBarWidth, maxBarWidth);
-    this.doc.roundedRect(this.margin + 55, chartY + barSpacing * 2, sodiumWidth, barHeight, 2, 2, 'F');
-    this.doc.setFont('helvetica', 'normal');
-    this.doc.setTextColor(80, 80, 80);
-    this.doc.text(`${sodium} mg`, this.margin + 55 + sodiumWidth + 8, chartY + barSpacing * 2 + 7);
+    const conservation = [
+      { icon: '❄', text: 'Manter em local fresco e seco' },
+      { icon: '☀', text: 'Proteger da luz solar direta' },
+      { icon: '📅', text: 'Consumir antes da data de validade' },
+      { icon: '🧊', text: 'Após aberto, conservar em refrigeração se necessário' },
+    ];
 
-    // Fat (purple)
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.setTextColor(51, 51, 51);
-    this.doc.text('Gordura', this.margin, chartY + barSpacing * 3 + 7);
-    this.doc.setFillColor(147, 51, 234);
-    const fatWidth = Math.min((fat / 20) * maxBarWidth, maxBarWidth);
-    this.doc.roundedRect(this.margin + 55, chartY + barSpacing * 3, fatWidth, barHeight, 2, 2, 'F');
-    this.doc.setFont('helvetica', 'normal');
-    this.doc.setTextColor(80, 80, 80);
-    this.doc.text(`${fat} g`, this.margin + 55 + fatWidth + 8, chartY + barSpacing * 3 + 7);
+    conservation.forEach((item) => {
+      this.doc.setTextColor(accentRgb[0], accentRgb[1], accentRgb[2]);
+      this.doc.text(item.icon, this.margin, y);
+      this.doc.setTextColor(hexToRgb(COLOR_TEXT_DARK)[0], hexToRgb(COLOR_TEXT_DARK)[1], hexToRgb(COLOR_TEXT_DARK)[2]);
+      this.doc.text(item.text, this.margin + 8, y);
+      y += 6;
+    });
 
-    y = chartY + barSpacing * 4 + 25;
+    y += 8;
 
-    // Bloco 3: Resultados Bendula
-    y = this.addSectionTitle('Resultados Bendula', y);
+    // Check page break
+    y = this.ensurePageBreak(y, 100);
 
-    // Score card
-    this.doc.setFillColor(245, 245, 245);
-    this.doc.roundedRect(this.margin, y - 5, this.pageWidth - 2 * this.margin, 35, 5, 5, 'F');
-    
-    // Classification badge
-    this.doc.setFillColor(classificationColor[0], classificationColor[1], classificationColor[2]);
-    this.doc.roundedRect(this.margin + 10, y, 80, 20, 3, 3, 'F');
-    this.doc.setTextColor(255, 255, 255);
-    this.doc.setFontSize(12);
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.text(classification.toUpperCase(), this.margin + 50, y + 13, { align: 'center' });
-
-    // Score
-    this.doc.setTextColor(51, 51, 51);
-    this.doc.setFontSize(24);
-    this.doc.setFont('helvetica', 'bold');
-    this.doc.text(`${healthScore}/100`, this.pageWidth - this.margin - 30, y + 13, { align: 'center' });
-    this.doc.setFontSize(10);
-    this.doc.setFont('helvetica', 'normal');
-    this.doc.text('Score Nutricional', this.pageWidth - this.margin - 30, y + 22, { align: 'center' });
-
-    y += 45;
-
-    // Descriptive summary
-    this.doc.setFontSize(10);
-    this.doc.setFont('helvetica', 'normal');
-    this.doc.setTextColor(80, 80, 80);
-    const description = isImageAnalysis 
-      ? (analysis.notes || 'Análise baseada em inteligência artificial.')
-      : `O produto ${productName} foi analisado e classificado como ${classification}. Fabricante: ${supplier}. Validade: ${expiry}.`;
-    const splitDescription = this.doc.splitTextToSize(description, this.pageWidth - 2 * this.margin);
-    this.doc.text(splitDescription, this.margin, y);
-    y += splitDescription.length * 5 + 25;
-
-    // Bloco 4: Seções de Diretrizes
+    // Bloco 5: Alertas Encontrados
     const alerts = [];
     if (isImageAnalysis) {
-      if (analysis.possible_allergens && analysis.possible_allergens.length > 0) {
-        alerts.push(`Contém alergénios: ${analysis.possible_allergens.join(', ')}`);
-      }
       if (analysis.processing_level === 'ultra processado') {
         alerts.push('Alimento ultra processado');
       }
@@ -362,98 +428,40 @@ export class PDFService {
       if (manualData.sodium > 600) alerts.push('Alto teor de sódio');
     }
 
-    // Conservação Recomendada
-    y = this.addSectionTitle('Conservação Recomendada', y);
-    this.doc.setFontSize(10);
-    this.doc.setFont('helvetica', 'normal');
-    this.doc.setTextColor(80, 80, 80);
-    const conservation = [
-      '• Manter em local fresco e seco',
-      '• Proteger da luz solar direta',
-      '• Consumir antes da data de validade',
-      '• Após aberto, conservar em refrigeração se necessário',
-    ];
-    conservation.forEach((item) => {
-      this.doc.text(item, this.margin, y);
-      y += 7;
-    });
-    y += 12;
-
-    // Alertas encontrados
-    y = this.addSectionTitle('Alertas Encontrados', y);
     if (alerts.length > 0) {
-      this.doc.setTextColor(239, 68, 68);
+      y = this.addSectionTitle('Alertas Encontrados', y);
+      const alertBgRgb = hexToRgb(COLOR_ALERT_BG);
+      const alertTextRgb = hexToRgb(COLOR_ALERT_TEXT);
+      const amberRgb = [240, 180, 41]; // #F0B429
+
       alerts.forEach((alert) => {
-        const splitAlert = this.doc.splitTextToSize(`✗ ${alert}`, this.pageWidth - 2 * this.margin);
-        this.doc.text(splitAlert, this.margin, y);
-        y += splitAlert.length * 5 + 6;
+        const splitAlert = this.doc.splitTextToSize(alert, this.pageWidth - 2 * this.margin - 12);
+        const alertHeight = splitAlert.length * 4 + 8;
+
+        this.doc.setFillColor(alertBgRgb[0], alertBgRgb[1], alertBgRgb[2]);
+        this.doc.roundedRect(this.margin, y - 2, this.pageWidth - 2 * this.margin, alertHeight, 3, 3, 'F');
+
+        // Left amber border
+        this.doc.setFillColor(amberRgb[0], amberRgb[1], amberRgb[2]);
+        this.doc.rect(this.margin, y - 2, 3, alertHeight, 'F');
+
+        this.doc.setTextColor(alertTextRgb[0], alertTextRgb[1], alertTextRgb[2]);
+        this.doc.setFontSize(8);
+        this.doc.setFont('helvetica', 'normal');
+        this.doc.text(`! ${splitAlert[0]}`, this.margin + 6, y + 2);
+        for (let i = 1; i < splitAlert.length; i++) {
+          this.doc.text(splitAlert[i], this.margin + 6, y + 2 + i * 4);
+        }
+        y += alertHeight + 4;
       });
-    } else {
-      this.doc.setTextColor(22, 163, 74);
-      this.doc.text('✓ Nenhum alerta crítico identificado.', this.margin, y);
-      y += 10;
-    }
-    y += 12;
-
-    // Benefícios
-    y = this.addSectionTitle('Benefícios', y);
-    this.doc.setTextColor(22, 163, 74);
-    const benefits = isImageAnalysis 
-      ? ['Análise realizada com IA de última geração']
-      : ['Dados inseridos manualmente pelo utilizador', 'Informações nutricionais detalhadas'];
-    benefits.forEach((benefit) => {
-      const splitBenefit = this.doc.splitTextToSize(`✓ ${benefit}`, this.pageWidth - 2 * this.margin);
-      this.doc.text(splitBenefit, this.margin, y);
-      y += splitBenefit.length * 5 + 6;
-    });
-    y += 12;
-
-    // Recomendações
-    y = this.addSectionTitle('Recomendações', y);
-    this.doc.setTextColor(80, 80, 80);
-    const recommendations = [
-      '• Consumo moderado recomendado',
-      '• Consulte nutricionista para orientações personalizadas',
-      '• Mantenha uma dieta equilibrada e variada',
-    ];
-    recommendations.forEach((rec) => {
-      this.doc.text(rec, this.margin, y);
-      y += 7;
-    });
-    y += 12;
-
-    // Quem pode consumir
-    y = this.addSectionTitle('Quem Pode Consumir', y);
-    this.doc.setTextColor(22, 163, 74);
-    const canConsume = ['Adultos saudáveis', 'Crianças (com moderação)', 'Idosos (com supervisão)'];
-    canConsume.forEach((item) => {
-      this.doc.text(`✓ ${item}`, this.margin, y);
-      y += 7;
-    });
-    y += 12;
-
-    // Quem deve evitar
-    y = this.addSectionTitle('Quem Deve Evitar', y);
-    this.doc.setTextColor(239, 68, 68);
-    if (alerts.length > 0) {
-      const avoidList = ['Pessoas com diabetes', 'Pessoas com hipertensão', 'Pessoas com colesterol alto'];
-      avoidList.forEach((item) => {
-        this.doc.text(`✗ ${item}`, this.margin, y);
-        y += 7;
-      });
-    } else {
-      this.doc.setTextColor(22, 163, 74);
-      this.doc.text('✓ Nenhum grupo específico precisa evitar', this.margin, y);
-      y += 7;
+      y += 8;
     }
 
-    y += 12;
-
-    // Ensure we have space before footer on page 2
+    // Check page break
     y = this.ensurePageBreak(y, 70);
 
-    // Footer for page 2
-    this.addFooter(2, 2);
+    // Footer for page 1
+    this.addFooter(1, 1);
 
     // Save the PDF
     this.doc.save(`bendula-relatorio-${productName.replace(/\s+/g, '-')}.pdf`);

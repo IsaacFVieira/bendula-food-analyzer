@@ -10,6 +10,13 @@ export interface FoodAnalysis {
   health_score?: number;
   confidence?: 'baixa' | 'média' | 'alta';
   notes?: string;
+  nutritional_info?: {
+    calories?: number;
+    sugar?: number;
+    sodium?: number;
+    fat?: number;
+    protein?: number;
+  };
 }
 
 export interface ManualFoodEntry {

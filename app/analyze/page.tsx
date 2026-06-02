@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { ArrowLeft } from 'lucide-react';
 import { ImageUpload } from '@/components/ImageUpload';
 import { AnalysisResult } from '@/components/AnalysisResult';
+import { ErrorFallback } from '@/components/ErrorFallback';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { UploadState, AnalysisResult as AnalysisResultType, FoodAnalysis } from '@/types';
 import { useAnalysis } from '@/contexts/AnalysisContext';
@@ -14,7 +15,7 @@ import { addToast } from '@/services/toastService';
 export default function AnalyzePage() {
   const router = useRouter();
   const { setCurrentAnalysis } = useAnalysis();
-  
+
   const [uploadState, setUploadState] = useState<UploadState>({
     isDragging: false,
     isUploading: false,
@@ -23,8 +24,14 @@ export default function AnalyzePage() {
   });
   const [analysis, setAnalysis] = useState<FoodAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showErrorFallback, setShowErrorFallback] = useState(false);
+  const [savedImageData, setSavedImageData] = useState<string | null>(null);
+  const activeRequestIdRef = useRef<string | null>(null);
 
   const handleImageSelect = async (base64: string, file: File) => {
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    activeRequestIdRef.current = requestId;
+
     setUploadState((prev) => ({
       ...prev,
       preview: base64,
@@ -33,6 +40,8 @@ export default function AnalyzePage() {
     }));
     setIsLoading(true);
     setAnalysis(null);
+    setShowErrorFallback(false);
+    setSavedImageData(base64);
 
     try {
       const response = await fetch('/api/analyze', {
@@ -40,7 +49,7 @@ export default function AnalyzePage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ imageBase64: base64 }),
+        body: JSON.stringify({ imageBase64: base64, requestId }),
       });
 
       if (!response.ok) {
@@ -50,34 +59,49 @@ export default function AnalyzePage() {
       }
 
       const data = await response.json();
-      
-      setAnalysis(data.analysis);
-      
-      if (data.analysis.is_food) {
-        addToast('success', 'Alimento identificado com sucesso!');
-        
-        // Save to context for report page
-        const result: AnalysisResultType = {
-          id: Date.now().toString(),
-          imageUrl: base64,
-          analysis: data.analysis,
-          timestamp: Date.now(),
-          analysisType: 'image',
-        };
-        setCurrentAnalysis(result);
-      } else {
-        addToast('info', 'A imagem não contém alimentos');
+
+      // Only update analysis data if this response matches the latest request
+      if (activeRequestIdRef.current === requestId) {
+        setAnalysis(data.analysis);
+
+        if (data.analysis.is_food) {
+          addToast('success', 'Alimento identificado com sucesso!');
+
+          // Save to context for report page
+          const result: AnalysisResultType = {
+            id: Date.now().toString(),
+            imageUrl: base64,
+            analysis: data.analysis,
+            timestamp: Date.now(),
+            analysisType: 'image',
+          };
+          setCurrentAnalysis(result);
+        } else {
+          addToast('info', 'A imagem não contém alimentos');
+        }
       }
     } catch (error) {
-      setUploadState((prev) => ({
-        ...prev,
-        error: 'Erro ao analisar imagem. Tente novamente.',
-      }));
-      addToast('error', 'Erro ao analisar imagem');
+      // Only update error state if this response matches the latest request
+      if (activeRequestIdRef.current === requestId) {
+        console.error('[Frontend] Erro na análise:', error);
+        setShowErrorFallback(true);
+      }
     } finally {
+      // Always update loading state to prevent infinite loading
       setUploadState((prev) => ({ ...prev, isUploading: false }));
       setIsLoading(false);
     }
+  };
+
+  const handleRetry = () => {
+    if (savedImageData) {
+      handleImageSelect(savedImageData, new File([], 'image.jpg'));
+    }
+  };
+
+  const handleManualAnalysis = () => {
+    // Redirect to manual analysis page
+    router.push('/analisar/manual');
   };
 
   const handleClear = () => {
@@ -88,6 +112,8 @@ export default function AnalyzePage() {
       error: null,
     });
     setAnalysis(null);
+    setShowErrorFallback(false);
+    setSavedImageData(null);
   };
 
   const handleViewReport = () => {
@@ -108,14 +134,14 @@ export default function AnalyzePage() {
           Voltar
         </button>
 
-        {!analysis && !isLoading ? (
+        {!analysis && !isLoading && !showErrorFallback ? (
           <>
             {/* Hero Section */}
             <div className="text-center py-12 animate-fade-in">
               <h2 className="text-4xl font-bold mb-6 text-gray-900">
                 Análise por Imagem
               </h2>
-              
+
               <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-8">
                 Envie uma imagem do alimento para análise automática usando inteligência artificial.
               </p>
@@ -143,7 +169,7 @@ export default function AnalyzePage() {
                     Cancelar
                   </button>
                 </div>
-                
+
                 <Skeleton className="h-64 w-full rounded-xl" />
                 <div className="space-y-4">
                   <Skeleton className="h-32 w-full" />
@@ -151,6 +177,12 @@ export default function AnalyzePage() {
                   <Skeleton className="h-32 w-full" />
                 </div>
               </div>
+            ) : showErrorFallback ? (
+              <ErrorFallback
+                onRetry={handleRetry}
+                onManualAnalysis={handleManualAnalysis}
+                isRetrying={isLoading}
+              />
             ) : analysis && (
               <div className="space-y-6 animate-fade-in">
                 <div className="flex items-center justify-between mb-6">
@@ -174,7 +206,7 @@ export default function AnalyzePage() {
                     </button>
                   </div>
                 </div>
-                
+
                 {uploadState.preview && (
                   <Image
                     src={uploadState.preview}
@@ -185,7 +217,7 @@ export default function AnalyzePage() {
                     unoptimized
                   />
                 )}
-                
+
                 <AnalysisResult
                   analysis={analysis}
                   imageUrl={uploadState.preview || ''}

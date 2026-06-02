@@ -298,7 +298,7 @@ export default function ReportPage() {
                   alerts.map((alert, index) => (
                     <li key={index} className="flex items-start gap-2 text-sm text-gray-700">
                       <XCircle className="h-4 w-4 text-[#ef4444] mt-0.5 flex-shrink-0" />
-                      Pessoas alérgicas a ingredientes específicos do rótulo.
+                      {alert}
                     </li>
                   ))
                 ) : (
